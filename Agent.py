@@ -5,8 +5,8 @@ from tavily import TavilyClient
 from datetime import datetime
 
 
-GEMINI_API_KEY = "AIzaSyCRM2WSP4-uX8mb0w0YktajHV1vPScVkcA"
-TAVILY_API_KEY = "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"
+GEMINI_API_KEY = ""
+TAVILY_API_KEY = ""
 
 
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
