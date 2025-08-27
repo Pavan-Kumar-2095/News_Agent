@@ -15,17 +15,13 @@ This Python script creates a daily news digest based on user-specified topics. I
 ---
 ## Example Run
 
-Starting the news digest process...
+Hey! Enter the topics you want news on, separated by commas.
 
-Working on topic: indian tech
-Searching for news about 'indian tech'...
-Here's a summary about 'indian tech':
-Indian tech news currently focuses on new product launches. Recent releases include new mobile phones, laptops, gaming gadgets, and other electronics from various brands such as Sony and Samsung. Specific examples include Sony's ULT Power Sound series and Samsung's 2025 Soundbar lineup, along with a Milagrow robotic vacuum cleaner. Pricing details are often included in the reporting.
-----------------------------------------
-Working on topic: indian sports
-Searching for news about 'indian sports'...
-Here's a summary about 'indian sports':
-Indian sports news is currently dominated by several key events and announcements. Ravichandran Ashwin's retirement from the Indian Premier League (IPL) is making headlines, alongside celebrations of India's T20 World Cup victory. The women's national hockey team is preparing for the Junior World Cup in 2025, and the Indian women's cricket team will host Australia in an ODI series before the World Cup. Additionally, India's senior bridge team secured a silver medal in the World Bridge Olympiad. News sources also cover a broader range of sports, including Pro Kabaddi League updates.
+Example: tech, sports, politics, science
+
+Your topics: indian tech, indian sports 
+
+Starting the news digest process...
 ----------------------------------------
 
 *** Daily News Digest - 2025-08-27 ***
