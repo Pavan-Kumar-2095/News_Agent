@@ -5,13 +5,14 @@ from tavily import TavilyClient
 from datetime import datetime
 import faiss
 import threading
-from sentence_transformers import SentenceTransformer
+import os
+import json
 import numpy as np
-
+from sentence_transformers import SentenceTransformer
 
 GEMINI_API_KEY = ""
 TAVILY_API_KEY = ""
-
+RAG_FILE = "rag_knowledge.jsonl"
 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=GEMINI_API_KEY)
@@ -35,6 +36,44 @@ def embed_text(text: str) -> np.ndarray:
     return vec / np.linalg.norm(vec)
 
 
+def save_to_knowledge_file(query: str, summary: str, filename=RAG_FILE):
+    data = {
+        "query": query,
+        "summary": summary,
+        "timestamp": datetime.now().isoformat()
+    }
+    with open(filename, "a", encoding="utf-8") as f:
+        f.write(json.dumps(data) + "\n")
+
+def load_faiss_from_file(filename=RAG_FILE):
+    global faiss_index, faiss_queries, faiss_summaries
+    if not os.path.exists(filename):
+        return
+
+    vectors, queries, summaries = [], [], []
+
+    with open(filename, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                record = json.loads(line)
+                query = record["query"]
+                summary = record["summary"]
+                vec = embed_text(query).astype("float32")
+                vectors.append(vec)
+                queries.append(query)
+                summaries.append(summary)
+            except Exception as e:
+                print(f"[!] Failed to load record: {e}")
+
+    if vectors:
+        dim = len(vectors[0])
+        faiss_index = faiss.IndexFlatIP(dim)
+        faiss_index.add(np.array(vectors))
+        faiss_queries = queries
+        faiss_summaries = summaries
+        print(f"[✓] Loaded {len(vectors)} cached summaries from {filename}")
+
+
 def add_summary_to_faiss(query: str, summary: str):
     global faiss_index, faiss_queries, faiss_summaries
     vec = embed_text(query).astype('float32')
@@ -46,7 +85,8 @@ def add_summary_to_faiss(query: str, summary: str):
         faiss_queries.append(query.strip().lower())
         faiss_summaries.append(summary)
 
-    print(f"[✓] Cached summary for '{query}' in FAISS.")
+    save_to_knowledge_file(query, summary)
+    print(f"[✓] Cached summary for '{query}' in FAISS and saved to RAG file.")
 
 def search_faiss_for_summary(query: str, threshold=0.75) -> str | None:
     global faiss_index, faiss_queries, faiss_summaries
@@ -75,9 +115,9 @@ def search_faiss_for_summary(query: str, threshold=0.75) -> str | None:
 
 def search_tavily(state: NewsState) -> NewsState:
     topic = state["topic"]
-    topic_news = topic + " news"
+    query = topic + " news"
     print(f"🔍 Searching Tavily for '{topic}'...")
-    results = tavily.search(topic_news)
+    results = tavily.search(query)
 
     if not results.get("results"):
         state["search_results"] = "No relevant results found."
@@ -90,7 +130,8 @@ def search_tavily(state: NewsState) -> NewsState:
 def summarize_with_gemini(state: NewsState) -> NewsState:
     print("✏️ Getting summary from Gemini...")
     prompt = f"""
-Hey! You're a journalist. Write a short summary about '{state['topic']}' based ONLY on the info below.
+You are a journalist. Write a short and clear summary about the topic: '{state['topic']}'.
+Use ONLY the information provided below. Be factual, concise, and neutral.
 
 Sources:
 {state['search_results']}
@@ -104,7 +145,6 @@ def collect_digest(state: NewsState) -> NewsState:
     print(state["summary"])
     print("-" * 50)
     return state
-
 
 def build_search_graph():
     graph = StateGraph(NewsState)
@@ -121,26 +161,24 @@ def build_search_graph():
 
 
 def get_summary_for_topic(topic: str) -> str:
-    query = topic.strip().lower() + " news"
+    topic = topic.strip()
+    cache_key = topic.lower() + " news"
     state = {"topic": topic, "search_results": "", "summary": ""}
 
-   
-    cached = search_faiss_for_summary(query)
+    cached = search_faiss_for_summary(cache_key)
     if cached:
         print(f"[CACHE] Using cached summary for '{topic}'")
         state["summary"] = cached
         collect_digest(state)
         return cached
 
- 
     print(f"[CACHE MISS] Running Tavily + Gemini for '{topic}'")
     graph = build_search_graph()
     final_state = graph.invoke(state)
 
     summary = final_state.get("summary", "No summary available.")
-    add_summary_to_faiss(query, summary)
+    add_summary_to_faiss(cache_key, summary)
     return summary
-
 
 def run_graph(topics: List[str]):
     print("\n🌐 Starting Daily News Digest...\n")
@@ -161,6 +199,9 @@ def run_graph(topics: List[str]):
 
 
 if __name__ == "__main__":
+    print("🔁 Loading RAG knowledge base...")
+    load_faiss_from_file()
+
     print("🔎 Enter the topics you want news on, separated by commas.")
     print("Type 'exit' to quit.\n")
 
